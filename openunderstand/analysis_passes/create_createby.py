@@ -1,11 +1,9 @@
-
-
-#expression -> NEW creator
+# expression -> NEW creator
 
 
 """
 ## Description
-This module find all OpenUnderstand call and callby references in a Java project
+This module find all OpenUnderstand create and createby references in a Java project
 
 
 ## References
@@ -13,35 +11,51 @@ This module find all OpenUnderstand call and callby references in a Java project
 
 """
 
-__author__ = 'Shaghayegh Mobasher , Setayesh kouloubandi ,Parisa Alaie'
+__author__ = 'Parmida Majmasanaye , Zahra Momeninezhad , Bayan Divaani-Azar , Bavan Divaani-Azar'
 __version__ = '0.1.0'
 
 from gen.javaLabeled.JavaParserLabeledListener import JavaParserLabeledListener
 from gen.javaLabeled.JavaParserLabeled import JavaParserLabeled
 import analysis_passes.class_properties as class_properties
 
-class CreateAndCreateBy(JavaParserLabeledListener):
 
-    def findmethodreturntype(self, c):
+class CreateAndCreateByListener(JavaParserLabeledListener):
+
+    def __init__(self):
+        self.class_name = None
+        self.package_name = None
+        self.refers = {}
+        self.create = []
+
+    def get_refers(self):
+        print(self.refers)
+        return self.refers
+
+    def get_create(self):
+        return self.create
+
+    def get_method_content(self, c):
         parents = ""
-        context = ""
+        content = ""
         current = c
         while current is not None:
-            if type(current.parentCtx).__name__ == "MethodDeclarationContext":
-                parents=(current.parentCtx.typeTypeOrVoid().getText())
-                context=current.parentCtx.getText()
+            if type(current.parentCtx).__name__ == "ClassBodyDeclaration2Context":
+                content = current.parentCtx.getText()
                 break
+                parents = (current.parentCtx.typeTypeOrVoid().getText())
             current = current.parentCtx
 
-        return parents,context
+        print(f"Entity contex : {content}")
 
-    def findmethodacess(self, c):
+        return parents, content
+
+    def get_method_modifiers(self, c):
         parents = ""
-        modifiers=[]
+        modifiers = []
         current = c
         while current is not None:
             if "ClassBodyDeclaration" in type(current.parentCtx).__name__:
-                parents=(current.parentCtx.modifier())
+                parents = (current.parentCtx.modifier())
                 break
             current = current.parentCtx
         for x in parents:
@@ -49,26 +63,31 @@ class CreateAndCreateBy(JavaParserLabeledListener):
                 modifiers.append(x.classOrInterfaceModifier().getText())
         return modifiers
 
+    def enterPackageDeclaration(self, ctx: JavaParserLabeled.PackageDeclarationContext):
+        self.package_name = ctx.qualifiedName().getText()
 
-    create = []
+    def enterClassDeclaration(self, ctx: JavaParserLabeled.ClassDeclarationContext):
+        self.class_name = ctx.IDENTIFIER().getText()
 
-    def enterExpression4(self, ctx:JavaParserLabeled.Expression4Context):
-        modifiers=self.findmethodacess(ctx)
-        mothodedreturn,methodcontext=self.findmethodreturntype(ctx)
+    def enterExpression4(self, ctx: JavaParserLabeled.Expression4Context):
+
+        new_class_name = ctx.creator().createdName().IDENTIFIER()[0].getText()
+
+        if not self.refers.__contains__(self.class_name):
+            self.refers[self.class_name] = []
+        self.refers[self.class_name].append(new_class_name)
 
         if ctx.creator().classCreatorRest():
-            allrefs= class_properties.ClassPropertiesListener.findParents(ctx)  #self.findParents(ctx)
-            refent=allrefs[-1]
-            entlongname=".".join(allrefs)
+            all_refs = class_properties.ClassPropertiesListener.findParents(ctx)
             [line, col] = str(ctx.start).split(",")[3].split(":")
 
-            self.create.append({"scopename":refent,"scopelongname":entlongname,"scopemodifiers":modifiers,
-                                "scopereturntype":mothodedreturn,"scopecontent":methodcontext,
-                                "line":line,"col":col[:-1],"refent":ctx.creator().createdName().getText(),
-                                "scope_parent": allrefs[-2] if len(allrefs) > 2 else None,
-                                "potential_refent":".".join(allrefs[:-1]) + "." + ctx.creator().createdName().getText()})
+            modifiers = self.get_method_modifiers(ctx)
+            method_return, method_context = self.get_method_content(ctx)
 
-
-
-
-
+            self.create.append(
+                {"scope_name": all_refs[-1], "scope_longname": ".".join(all_refs), "scope_modifiers": modifiers,
+                 "scope_return_type": method_return, "scope_content": method_context,
+                 "line": line, "col": col[:-1], "refent": new_class_name,
+                 "scope_parent": all_refs[-2] if len(all_refs) > 2 else None,
+                 "potential_refent": ".".join(
+                     all_refs[:-1]) + "." + new_class_name, "package_name": self.package_name})
