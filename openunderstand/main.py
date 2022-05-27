@@ -17,11 +17,11 @@ from oudb.fill import main
 
 from analysis_passes.couple_coupleby import ImplementCoupleAndImplementByCoupleBy
 
-from analysis_passes.create_createby import CreateAndCreateByListener
-from analysis_passes.declare_declarein import DeclareAndDeclareinListener
+from analysis_passes.g6_create_createby import CreateAndCreateByListener
+from analysis_passes.g6_declare_declarein import DeclareAndDeclareinListener
 
-from analysis_passes.class_properties import ClassPropertiesListener, InterfacePropertiesListener
-from analysis_passes.import_importby import ImportListener
+from analysis_passes.g6_class_properties import ClassPropertiesListener, InterfacePropertiesListener
+# from analysis_passes.import_importby import ImportListener
 
 class Project():
     tree = None
@@ -106,8 +106,9 @@ class Project():
                                               _type=ref_dict["scope_return_type"]
                                               , _parent=ref_dict["scope_parent"] if ref_dict["scope_parent"] is not None else file_ent
                                               , _longname=ref_dict["package_name"]+"."+ref_dict["scope_longname"]
-                                              , _contents=["scope_content"])[0]
-            ent = self.getCreatedClassEntity(ref_dict["package_name"]+"."+ref_dict["refent"], ref_dict["potential_refent"], file_address)
+                                              , _contents=ref_dict["scope_content"])[0]
+            new_file_address = file_address.split('\com')[0]+"\\"+ref_dict["new_class_path"]
+            ent = self.getCreatedClassEntity(ref_dict["new_class_name"], new_file_address)
             Create = ReferenceModel.get_or_create(_kind=190, _file=file_ent, _line=ref_dict["line"],
                                                   _column=ref_dict["col"], _scope=scope, _ent=ent)
             Createby = ReferenceModel.get_or_create(_kind=191, _file=file_ent, _line=ref_dict["line"],
@@ -125,11 +126,16 @@ class Project():
                                         _longname="(Unnamed_Package)", _contents="")
         return ent[0]
 
-    def getClassProperties(self, class_longname, file_address):
+    def getClassProperties(self, class_longname, file_address2):
         listener = ClassPropertiesListener()
         listener.class_longname = class_longname.split(".")
         listener.class_properties = None
-        self.Walk(listener, self.tree)
+        tree2 = p.Parse(file_address2)
+        try:
+            tree2 = p.Parse(file_address2)
+        except Exception as e:
+            print("An Error occurred in file:" + file_address2 + "\n" + str(e))
+        self.Walk(listener, tree2)
         return listener.class_properties
 
     def getInterfaceProperties(self, interface_longname, file_address):
@@ -139,15 +145,11 @@ class Project():
         self.Walk(listener, self.tree)
         return listener.interface_properties
 
-    def getCreatedClassEntity(self, class_longname, class_potential_longname, file_address):
-        props = p.getClassProperties(class_potential_longname, file_address)
-        if not props:
-            return self.getClassEntity(class_longname, file_address)
-        else:
-            return self.getClassEntity(class_potential_longname, file_address)
+    def getCreatedClassEntity(self, class_name, file_address2):
+        return self.getClassEntity(class_name, file_address2)
 
-    def getClassEntity(self, class_longname, file_address):
-        props = p.getClassProperties(class_longname, file_address)
+    def getClassEntity(self, class_longname, file_address2):
+        props = p.getClassProperties(class_longname, file_address2)
         if not props:  # This class is unknown, unknown class id: 84
             ent = EntityModel.get_or_create(_kind=84, _name=class_longname.split(".")[-1],
                                             _longname=class_longname, _contents="")
@@ -156,7 +158,7 @@ class Project():
                 props["modifiers"].append("default")
             kind = self.findKindWithKeywords("Class", props["modifiers"])
             ent = EntityModel.get_or_create(_kind=kind, _name=props["name"],
-                                            _longname=props["longname"],
+                                            _longname=props["package_name"]+"."+props["longname"],
                                             _parent=props["parent"] if props["parent"] is not None else file_ent,
                                             _contents=props["contents"])
         return ent[0]
@@ -209,6 +211,7 @@ if __name__ == '__main__':
     path = Project.listToString(pathArray) + "benchmark"
     files = p.getListOfFiles(path)
 
+
     for file_address in files:
         try:
             file_ent = p.getFileEntity(file_address)
@@ -246,7 +249,5 @@ if __name__ == '__main__':
             listener = DeclareAndDeclareinListener()
             p.Walk(listener, tree)
             p.addDeclareRefs(listener.get_declare_dicts, file_ent)
-            print('declaration dictionary : \n')
-            print(listener.get_declare_dicts)
         except Exception as e:
             print("An Error occurred for reference declare in file:" + file_address + "\n" + str(e))
