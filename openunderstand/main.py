@@ -206,9 +206,12 @@ if __name__ == '__main__':
     main()
     db = db_open("../benchmark2_database.oudb")
     # get file name
-    rawPath = str(os.path.dirname(__file__).replace("\\", "/"))
-    pathArray = rawPath.split('/')
-    path = Project.listToString(pathArray) + "benchmark"
+    # rawPath = str(os.path.dirname(__file__).replace("\\", "/"))
+    # pathArray = rawPath.split('/')
+    # path = Project.listToString(pathArray) + "benchmark"
+    # files = p.getListOfFiles(path)
+
+    path = r"C:\Users\ASUS\Desktop\term_4002\Compiler\project\phase1\New folder\bavan\OpenUnderstand\benchmark\calculator_app"
     files = p.getListOfFiles(path)
 
 
@@ -237,12 +240,12 @@ if __name__ == '__main__':
         except Exception as e:
             print("An Error occurred for reference implement in file:" + file_address + "\n" + str(e))
 
-        try:
-            # import
-            listener = ImportListener()
-            p.Walk(listener, tree)
-        except Exception as e:
-            print("An Error occurred for reference import in file:" + file_address + "\n" + str(e))
+        # try:
+        #     # import
+        #     listener = ImportListener()
+        #     p.Walk(listener, tree)
+        # except Exception as e:
+        #     print("An Error occurred for reference import in file:" + file_address + "\n" + str(e))
 
         try:
             # declare
